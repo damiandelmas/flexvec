@@ -1,0 +1,31 @@
+[project]
+name = "flexvec"
+version = "0.3.0"
+description = "numpy-backed semantic search for any SQLite database"
+license = { text = "MIT" }
+authors = [{name = "Damian Delmas", email = "damian@getflex.dev"}]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+embed = ["onnxruntime", "tokenizers"]
+graph = ["networkx"]
+
+[project.urls]
+Homepage = "https://github.com/damiandelmas/flexvec"
+# Paper = "https://arxiv.org/abs/XXXX"  # Update after arxiv submission
+
+[tool.setuptools.packages.find]
+include = ["flexvec*"]
+
+[tool.setuptools.package-data]
+flexvec = ["onnx/*.json", "onnx/vocab.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["unit", "vec_ops"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

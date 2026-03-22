@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+*.onnx
+*.onnx.data
+.venv/
+venv/
+
+# Secrets / env
+.env
+.env.*
+
+# Claude Code
+.claude/
+tests/benchmarks/
