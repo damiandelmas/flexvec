@@ -29,20 +29,18 @@ CREATE TABLE chunks (
 ```
 
 ```python
+# 1. Connect
 import sqlite3
 from flexvec import VectorCache, register_vec_ops, execute, get_embed_fn
 
 db = sqlite3.connect("my.db")
-
-# Load vectors into memory
 cache = VectorCache()
 cache.load_from_db(db, "chunks", "embedding", "id")
+register_vec_ops(db, {"chunks": cache}, get_embed_fn())
+```
 
-# Register vec_ops + keyword as SQL functions
-embed_fn = get_embed_fn()  # bundled Nomic ONNX model
-register_vec_ops(db, {"chunks": cache}, embed_fn)
-
-# Query — SQL in, rows out
+```python
+# 2. Query
 rows = execute(db, """
     SELECT v.id, v.score, c.content
     FROM vec_ops('similar:authentication patterns') v
