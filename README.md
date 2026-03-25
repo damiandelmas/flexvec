@@ -64,6 +64,33 @@ Tokens reshape scores. They compose freely in a single string.
 
 `'similar:auth diverse suppress:oauth decay:7'` — four operations, one query.
 
+## Getting started
+
+```python
+import sqlite3
+from flexvec import VectorCache, register_vec_ops, execute, get_embed_fn
+
+db = sqlite3.connect("my.db")
+
+# Load vectors into memory
+cache = VectorCache()
+cache.load_from_db(db, "chunks", "embedding", "id")
+
+# Register vec_ops + keyword as SQL functions
+embed_fn = get_embed_fn()  # bundled Nomic ONNX model
+register_vec_ops(db, {"chunks": cache}, embed_fn)
+
+# Query — SQL in, rows out
+rows = execute(db, """
+    SELECT v.id, v.score, c.content
+    FROM vec_ops('similar:debugging crash fix diverse') v
+    JOIN chunks c ON v.id = c.id
+    ORDER BY v.score DESC LIMIT 5
+""")
+```
+
+Any SQLite database with an embedding column works. Load it, register it, query it.
+
 ## How it works
 
 ```
