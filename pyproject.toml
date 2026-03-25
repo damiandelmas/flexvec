@@ -14,7 +14,7 @@ graph = ["networkx"]
 
 [project.urls]
 Homepage = "https://github.com/damiandelmas/flexvec"
-# Paper = "https://arxiv.org/abs/XXXX"  # Update after arxiv submission
+# Paper = "https://arxiv.org/abs/2603.22587"  # Update after arxiv submission
 
 [tool.setuptools.packages.find]
 include = ["flexvec*"]

@@ -84,7 +84,7 @@ pip install flexvec[embed,graph] # everything
 
 ## See also
 
-- **[arXiv paper](https://arxiv.org/abs/XXXX.XXXXX)** — architecture and evaluation
+- **[arXiv paper](https://arxiv.org/abs/2603.22587)** — architecture and evaluation
 - **[flex](https://github.com/damiandelmas/flex)** — search and retrieval for AI agents (uses flexvec)
 - **[getflex.dev](https://getflex.dev)**
 
