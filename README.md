@@ -18,6 +18,8 @@ pip install flexvec
 
 ## Sample usage
 
+### Semantic search with modulation
+
 Want to find authentication patterns without drowning in deployment and testing discussions?
 
 ```sql
@@ -31,6 +33,8 @@ ORDER BY v.score DESC LIMIT 10
 ```
 
 The SQL pre-filter scopes to chunks longer than 200 characters — cutting out tool calls and one-liners before anything gets scored. `suppress:deployment` and `suppress:testing` push those clusters out of the results so the actual auth architecture surfaces. `diverse` makes sure you get breadth across subtopics — token handling, session management, middleware — instead of ten variations of the same login flow.
+
+### Hybrid retrieval
 
 Remember hitting an OOM error last month but can't find the session where you actually fixed it?
 
