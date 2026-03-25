@@ -18,6 +18,16 @@ pip install flexvec
 
 ## Getting started
 
+All you need is a SQLite table with an embedding column:
+
+```sql
+CREATE TABLE chunks (
+    id TEXT PRIMARY KEY,
+    content TEXT,
+    embedding BLOB  -- float32, L2-normalized
+);
+```
+
 ```python
 import sqlite3
 from flexvec import VectorCache, register_vec_ops, execute, get_embed_fn
