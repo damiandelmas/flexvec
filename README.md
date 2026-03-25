@@ -10,7 +10,7 @@
 
 Composable vector retrieval with SQL.
 
-flexvec is a Python library that lets you reshape scores before selection — suppress a topic, weight by recency, spread across subtopics, project a direction through embedding space. Runs in-process on any SQLite database with embeddings. No server, no index.
+flexvec is a Python library that reshapes vector search scores before selection. Suppress a topic, weight by recency, spread across subtopics, project a direction through embedding space — all in one SQL statement. Runs in-process on any SQLite database. No server, no index.
 
 ```bash
 pip install flexvec
@@ -18,7 +18,9 @@ pip install flexvec
 
 ## Getting started
 
-Any SQLite database with an embedding column works. Load it, register it, query it.
+### Your table
+
+Any SQLite database with an embedding column works.
 
 ```sql
 CREATE TABLE chunks (
@@ -28,8 +30,11 @@ CREATE TABLE chunks (
 );
 ```
 
+### Connect
+
+Load embeddings into memory once. Every query after that is a matmul.
+
 ```python
-# 1. Connect
 import sqlite3
 from flexvec import VectorCache, register_vec_ops, execute, get_embed_fn
 
@@ -39,8 +44,11 @@ cache.load_from_db(db, "chunks", "embedding", "id")
 register_vec_ops(db, {"chunks": cache}, get_embed_fn())
 ```
 
+### Search
+
+Write SQL. flexvec handles the vector math behind the scenes.
+
 ```python
-# 2. Query
 rows = execute(db, """
     SELECT v.id, v.score, c.content
     FROM vec_ops('similar:authentication patterns') v
@@ -49,11 +57,11 @@ rows = execute(db, """
 """)
 ```
 
-## Sample usage
+## Examples
 
-### Semantic search with modulation
+### Suppress and diversify
 
-Want to find authentication patterns without drowning in deployment and testing discussions?
+Find authentication patterns without drowning in deployment and testing discussions.
 
 ```sql
 SELECT v.id, v.score, c.content
@@ -65,11 +73,11 @@ JOIN chunks c ON v.id = c.id
 ORDER BY v.score DESC LIMIT 10
 ```
 
-The SQL pre-filter scopes to chunks longer than 200 characters — cutting out tool calls and one-liners before anything gets scored. `suppress:deployment` and `suppress:testing` push those clusters out of the results so the actual auth architecture surfaces. `diverse` makes sure you get breadth across subtopics — token handling, session management, middleware — instead of ten variations of the same login flow.
+`suppress:` pushes deployment and testing content out of the results. `diverse` spreads across subtopics instead of returning ten variations of the same match. The pre-filter scopes to chunks over 200 characters — cutting out noise before anything gets scored.
 
 ### Hybrid retrieval
 
-Remember hitting an OOM error last month but can't find the session where you actually fixed it?
+Find the session where you actually fixed that OOM error — not just the logs.
 
 ```sql
 SELECT k.id, k.rank, v.score, c.content
@@ -79,7 +87,7 @@ JOIN chunks c ON k.id = c.id
 ORDER BY v.score DESC LIMIT 10
 ```
 
-`keyword('OOM')` finds every chunk that literally contains "OOM" — could be dozens, most of them just error logs or passing mentions. The semantic side scores by relevance to actually debugging and fixing memory issues. The intersection keeps only the chunks where OOM appears AND the content is about the fix, not just the crash. You skip the noise and land on the session where you solved it.
+`keyword('OOM')` finds every chunk containing the term. `vec_ops()` scores by relevance to debugging and fixing. The JOIN keeps only chunks that match both — exact term plus semantic relevance.
 
 ## Tokens
 
@@ -99,11 +107,17 @@ Tokens reshape scores. They compose freely in a single string.
 
 ## How it works
 
+Every query runs three phases in one SQL statement.
+
 ```
 SQL pre-filter  →  numpy modulation  →  SQL compose
 ```
 
-SQL narrows what enters scoring. numpy runs cosine similarity + token modulations on the score array. Results materialize as a temp table — SQL composes the rest. The database is never modified.
+1. **SQL pre-filter** narrows what enters scoring — by date, type, length, or any SQL expression.
+2. **numpy modulation** scores candidates and reshapes the score array with tokens before selection.
+3. **SQL compose** joins results back to your tables for grouping, filtering, or reranking.
+
+The database is never modified. Results materialize as a temp table that SQL composes over.
 
 ## Performance
 
