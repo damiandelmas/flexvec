@@ -54,13 +54,13 @@ Tokens reshape scores. They compose freely in a single string.
 
 | token | what it does |
 |---|---|
-| `similar:TEXT` | embed text, cosine search |
-| `suppress:TEXT` | push a topic out of results (stackable) |
-| `diverse` | spread across subtopics instead of clustering |
-| `decay:N` | weight recent content — N-day half-life |
+| `similar:TEXT` | search for this concept |
+| `suppress:TEXT` | push this topic out of results (stackable) |
+| `diverse` | spread across subtopics instead of ten versions of the same answer |
+| `decay:N` | favor recent content — N-day half-life |
 | `centroid:id1,id2` | "more like these" — search from the average of examples |
-| `from:A to:B` | find content along a conceptual direction |
-| `pool:N` | candidate pool size (default 500) |
+| `from:A to:B` | find content along a conceptual arc |
+| `pool:N` | how many candidates to score (default 500) |
 
 `'similar:auth diverse suppress:oauth decay:7'` — four operations, one query.
 
