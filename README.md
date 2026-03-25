@@ -8,9 +8,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 
-Composable vector search with SQL.
+Composable vector retrieval with SQL: more than just semantic search. 
 
-Standard retrieval gives you top-K by similarity. flexvec lets you reshape the scores before selection — suppress a topic, weight by recency, spread across subtopics, project a direction through embedding space. All in one SQL statement.
+flexvec lets you reshape the scores before selection — suppress a topic, weight by recency, spread across subtopics, project a direction through embedding space. All in one SQL statement.
 
 ```bash
 pip install flexvec
@@ -27,6 +27,7 @@ CREATE TABLE chunks (
     embedding BLOB  -- float32, L2-normalized
 );
 ```
+Any SQLite database with an embedding column works. Load it, register it, query it.
 
 ```python
 import sqlite3
@@ -50,8 +51,6 @@ rows = execute(db, """
     ORDER BY v.score DESC LIMIT 5
 """)
 ```
-
-Any SQLite database with an embedding column works. Load it, register it, query it.
 
 ## Sample usage
 
