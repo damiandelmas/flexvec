@@ -42,15 +42,19 @@ ORDER BY v.score DESC LIMIT 10
 
 Tokens reshape scores. They compose freely in a single string.
 
-| token | what it does |
-|---|---|
-| `similar:TEXT` | embed text, cosine search |
-| `suppress:TEXT` | push a topic out of results (stackable) |
-| `diverse` | spread across subtopics instead of clustering |
-| `decay:N` | weight recent content — N-day half-life |
-| `centroid:id1,id2` | "more like these" — search from the average of examples |
-| `from:A to:B` | find content along a conceptual direction |
-| `pool:N` | candidate pool size (default 500) |
+**`similar:TEXT`** — embed text, cosine similarity. The base query. Required for semantic search.
+
+**`suppress:TEXT`** — subtract directional similarity toward a concept. When a corpus has a dominant cluster that buries what you actually want, suppress pushes it down so the buried content surfaces. Stackable — multiple suppress tokens compose additively.
+
+**`diverse`** — MMR iterative selection. Each successive result is penalized for similarity to already-selected results. You get breadth across subtopics instead of ten variations of the strongest match.
+
+**`decay:N`** — temporal decay with N-day half-life. A chunk from N days ago scores 50% of an identical chunk from today. Not a date filter — old content still surfaces if relevant enough.
+
+**`centroid:id1,id2`** — shift the query toward the mean of example chunks. When words don't capture the concept, point to examples and search from their centroid. Inspired by Rocchio relevance feedback.
+
+**`from:A to:B`** — trajectory through embedding space. Computes the direction vector between two concepts and blends it with query similarity. `from:prototype to:production` surfaces content along that arc without requiring those words.
+
+**`pool:N`** — candidate pool size (default 500). Controls how many scored results enter Phase 3.
 
 `'similar:auth diverse suppress:oauth decay:7'` — four operations, one query.
 
