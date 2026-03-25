@@ -8,9 +8,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 
-Composable vector retrieval with SQL: more than just semantic search. 
+Composable vector retrieval with SQL.
 
-flexvec lets you reshape the scores before selection — suppress a topic, weight by recency, spread across subtopics, project a direction through embedding space. All in one SQL statement.
+flexvec is a Python library that lets you reshape scores before selection — suppress a topic, weight by recency, spread across subtopics, project a direction through embedding space. Runs in-process on any SQLite database with embeddings. No server, no index.
 
 ```bash
 pip install flexvec
@@ -18,7 +18,7 @@ pip install flexvec
 
 ## Getting started
 
-All you need is a SQLite table with an embedding column:
+Any SQLite database with an embedding column works. Load it, register it, query it.
 
 ```sql
 CREATE TABLE chunks (
@@ -27,7 +27,6 @@ CREATE TABLE chunks (
     embedding BLOB  -- float32, L2-normalized
 );
 ```
-Any SQLite database with an embedding column works. Load it, register it, query it.
 
 ```python
 import sqlite3
@@ -46,7 +45,7 @@ register_vec_ops(db, {"chunks": cache}, embed_fn)
 # Query — SQL in, rows out
 rows = execute(db, """
     SELECT v.id, v.score, c.content
-    FROM vec_ops('similar:debugging crash fix diverse') v
+    FROM vec_ops('similar:authentication patterns') v
     JOIN chunks c ON v.id = c.id
     ORDER BY v.score DESC LIMIT 5
 """)
