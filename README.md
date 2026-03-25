@@ -18,8 +18,9 @@ pip install flexvec
 
 ## Sample usage
 
+Want to find authentication patterns without drowning in deployment and testing discussions?
+
 ```sql
--- find auth patterns, suppress deployment noise, spread across subtopics
 SELECT v.id, v.score, c.content
 FROM vec_ops(
     'similar:authentication patterns
@@ -29,14 +30,19 @@ JOIN chunks c ON v.id = c.id
 ORDER BY v.score DESC LIMIT 10
 ```
 
+The SQL pre-filter scopes to chunks longer than 200 characters — cutting out tool calls and one-liners before anything gets scored. `suppress:deployment` and `suppress:testing` push those clusters out of the results so the actual auth architecture surfaces. `diverse` makes sure you get breadth across subtopics — token handling, session management, middleware — instead of ten variations of the same login flow.
+
+Remember hitting an OOM error last month but can't find the session where you actually fixed it?
+
 ```sql
--- hybrid: keyword AND semantic
 SELECT k.id, k.rank, v.score, c.content
-FROM keyword('JWT rotation') k
-JOIN vec_ops('similar:authentication token refresh') v ON k.id = v.id
+FROM keyword('OOM') k
+JOIN vec_ops('similar:memory limit debugging worker crash fix') v ON k.id = v.id
 JOIN chunks c ON k.id = c.id
 ORDER BY v.score DESC LIMIT 10
 ```
+
+`keyword('OOM')` finds every chunk that literally contains "OOM" — could be dozens, most of them just error logs or passing mentions. The semantic side scores by relevance to actually debugging and fixing memory issues. The intersection keeps only the chunks where OOM appears AND the content is about the fix, not just the crash. You skip the noise and land on the session where you solved it.
 
 ## Tokens
 
