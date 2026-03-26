@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/banner.png" alt="flexvec" width="100%">
-</p>
-
 # flexvec
 
 [![PyPI](https://img.shields.io/pypi/v/flexvec)](https://pypi.org/project/flexvec/)
