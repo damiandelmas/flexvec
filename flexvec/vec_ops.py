@@ -26,6 +26,10 @@ from typing import Optional, List, Dict, Any
 
 from flexvec.score import parse_modifiers, score_candidates, _mmr_select
 
+# No query module hooks in standalone flexvec
+_TOKEN_RESOLVER = None
+_EXTRA_BOUNDARIES = None
+
 
 class VectorCache:
     """
@@ -158,6 +162,7 @@ class VectorCache:
             config=config,
             embed_fn=embed_fn,
             embed_doc_fn=embed_doc_fn,
+            token_resolver=_TOKEN_RESOLVER,
         )
 
     def _mmr_select_on(self, candidates: list, similarities: np.ndarray,
@@ -287,9 +292,8 @@ def materialize_vec_ops(db, sql: str) -> str:
         return json.dumps({"error": "vec_ops returned 0 results — pre-filter may have matched no chunks. Check your WHERE clause."})
 
     # Populate temp table (unique name per call for HTTP concurrency)
-    # Dynamic column construction: discover all _-prefixed columns from
-    # structural tokens (e.g. local_communities) and build the schema
-    # automatically. Any token can emit any column.
+    # Dynamic column construction: discover all _-prefixed columns
+    # and build the schema automatically. Any enrichment can emit columns.
     tmp_name = f"_vec_results_{uuid.uuid4().hex[:8]}"
 
     base_cols = [('id', 'TEXT PRIMARY KEY'), ('score', 'REAL')]
@@ -370,7 +374,7 @@ def register_vec_ops(conn, caches: dict, embed_fn, cell_config: dict = None,
             pre_filter_sql = args[1] if len(args) > 1 else None
 
             # Parse tokens to extract query_text from similar: token
-            modifiers_preview = parse_modifiers(token_str)
+            modifiers_preview = parse_modifiers(token_str, extra_boundaries=_EXTRA_BOUNDARIES)
             query_text = modifiers_preview.get('similar')
             modifier_str = token_str
 
@@ -385,7 +389,7 @@ def register_vec_ops(conn, caches: dict, embed_fn, cell_config: dict = None,
                 'has_timestamps': cache.timestamps is not None,
             })
 
-        modifiers = parse_modifiers(modifier_str) if modifier_str else None
+        modifiers = parse_modifiers(modifier_str, extra_boundaries=_EXTRA_BOUNDARIES) if modifier_str else None
 
         # SQL pre-filter: execute to get chunk IDs
         # Authorizer whitelist: pure SELECT only (READ=20, SELECT=21, FUNCTION=31, RECURSIVE=33)

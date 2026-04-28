@@ -16,29 +16,20 @@ import numpy as np
 from typing import Optional, List, Dict, Any
 
 
-def parse_modifiers(modifier_str: str) -> dict:
+def parse_modifiers(modifier_str: str, extra_boundaries: Optional[set] = None) -> dict:
     """Parse a modifier string into modulation parameters.
 
     Tokens (space-separated, composable):
 
-    Base tokens (define search origin — one required):
-        similar:TEXT         embed text, cosine search (implicit when query_text provided)
+        similar:TEXT         embed text, cosine search
         centroid:id1,id2,... mean-pool example chunks, search from centroid
-
-    Modulation tokens (reshape scoring landscape):
         diverse              MMR diversity selection
         decay[:N]            temporal decay (optional N-day half-life)
         suppress:TEXT        contrastive — demote similarity to TEXT
         from:TEXT to:TEXT    trajectory — direction through embedding space
         pool:N               candidate count (default 500)
-        communities          per-query Louvain, adds _community
 
-    Deprecated aliases (accepted, will be removed):
-        like: → centroid:, unlike: → suppress:, limit: → pool:, recent: → decay:
-        local_communities → communities, detect_communities → communities
-
-    Dead tokens (silently ignored): kind:TYPE, community:N
-    Unknown tokens silently ignored (forward-compatible).
+    Unknown tokens are collected and passed through for external consumers.
     """
     result = {
         'recent': False,
@@ -50,7 +41,7 @@ def parse_modifiers(modifier_str: str) -> dict:
         'similar': None,
         'trajectory_from': None,
         'trajectory_to': None,
-        'local_communities': False,
+        'extra_tokens': [],
     }
 
     if not modifier_str:
@@ -64,13 +55,16 @@ def parse_modifiers(modifier_str: str) -> dict:
     modifier_str = modifier_str.replace('limit:', 'pool:')
     modifier_str = re.sub(r'\brecent:', 'decay:', modifier_str)
     modifier_str = re.sub(r'\brecent\b', 'decay', modifier_str)
+    # Legacy aliases
     modifier_str = modifier_str.replace('local_communities', 'communities')
     modifier_str = modifier_str.replace('detect_communities', 'communities')
-    # Known token prefixes for boundary detection (canonical names only)
-    _TOKEN_BOUNDARY = (
-        r'diverse|decay:|suppress:|centroid:|pool:|'
-        r'communities|from:|similar:'
-    )
+
+    # Token boundary detection for multi-word token parsing.
+    _CORE_BOUNDARIES = r'diverse|decay:|suppress:|centroid:|pool:|from:|similar:'
+    if extra_boundaries:
+        _TOKEN_BOUNDARY = _CORE_BOUNDARIES + '|' + '|'.join(extra_boundaries)
+    else:
+        _TOKEN_BOUNDARY = _CORE_BOUNDARIES
 
     # Extract similar:TEXT (multi-word, up to next token boundary)
     similar_match = re.search(
@@ -126,8 +120,9 @@ def parse_modifiers(modifier_str: str) -> dict:
                 pass
         elif token.startswith('centroid:'):
             result['like'] = token.split(':', 1)[1].split(',')
-        elif token == 'communities':
-            result['local_communities'] = True
+        elif not token.startswith(('kind:', 'community:')):
+            # Unknown token — collect for external consumers
+            result['extra_tokens'].append(token)
         # kind: and community: silently ignored (dead tokens)
 
     return result
@@ -152,6 +147,7 @@ def score_candidates(
     config: Optional[dict] = None,
     embed_fn=None,
     embed_doc_fn=None,
+    token_resolver=None,
 ) -> List[Dict[str, Any]]:
     """Score and select candidates with composable landscape modulations.
 
@@ -322,57 +318,42 @@ def score_candidates(
 
     # Filter -inf
     top_indices = [i for i in top_indices if similarities[i] != -np.inf]
-    # All structural tokens operate on the same candidate pool and modulated
-    # embeddings. Each produces a dict {position_in_cand: {col: val}} that
-    # gets merged into results as _-prefixed columns.
-    #
-    # Modulation tokens (diverse, suppress, from:to, decay) have ALREADY
-    # reshaped active_matrix and similarities above. Structural tokens see
 
-    structural_enrichments = {}  # {cand_position: {_col: val}}
+    # === Extra enrichments on candidate set ===
+
+    extra_enrichments = {}  # {cand_position: {_col: val}}
     cand_pool = min(len(top_indices), limit)
     cand_indices = np.array(top_indices[:cand_pool]) if top_indices else np.array([], dtype=int)
     cand_vecs = active_matrix[cand_indices] if len(cand_indices) > 0 else np.array([])
     cand_ids = [active_ids[i] for i in cand_indices] if len(cand_indices) > 0 else []
 
     def _merge_enrichment(enrichment: dict):
-        """Merge {position: {col: val}} into structural_enrichments."""
+        """Merge {position: {col: val}} into extra_enrichments."""
         for pos, cols in enrichment.items():
-            if pos not in structural_enrichments:
-                structural_enrichments[pos] = {}
-            structural_enrichments[pos].update(cols)
+            if pos not in extra_enrichments:
+                extra_enrichments[pos] = {}
+            extra_enrichments[pos].update(cols)
 
-    # Local communities (query-time Louvain)
-    if modifiers and modifiers.get('local_communities') and len(cand_indices) >= 3:
-        import networkx as nx
-        sims = cand_vecs @ cand_vecs.T
-        comm_threshold = 0.5
-        rows, cols = np.where(np.triu(sims > comm_threshold, k=1))
-        G = nx.Graph()
-        G.add_nodes_from(range(len(cand_indices)))
-        G.add_weighted_edges_from(
-            (int(r), int(c), float(sims[r, c])) for r, c in zip(rows, cols)
-        )
-        if G.number_of_edges() > 0:
-            comms = nx.community.louvain_communities(G)
-            enrichment = {}
-            for ci, comm in enumerate(comms):
-                for node in comm:
-                    enrichment[int(node)] = {'_community': ci}
-            _merge_enrichment(enrichment)
+    # Extra tokens — resolved by caller-provided handler if present.
+    if token_resolver and modifiers and len(cand_indices) > 0 and modifiers.get('extra_tokens'):
+        for token_name in modifiers['extra_tokens']:
+            enrichment = token_resolver(
+                token_name, cand_ids, cand_vecs, modifiers)
+            if enrichment:
+                _merge_enrichment(enrichment)
 
-    # === Apply structural enrichments to results ===
+    # === Apply enrichments to results ===
     def _attach_enrichments(results_list):
-        """Attach _-prefixed structural columns to result dicts."""
-        if not structural_enrichments:
+        """Attach _-prefixed columns to result dicts."""
+        if not extra_enrichments:
             return
         cand_list = list(cand_indices)
         for r in results_list:
             orig_idx = active_id_to_idx.get(r['id'])
             if orig_idx is not None and orig_idx in cand_list:
                 pos = cand_list.index(orig_idx)
-                if pos in structural_enrichments:
-                    r.update(structural_enrichments[pos])
+                if pos in extra_enrichments:
+                    r.update(extra_enrichments[pos])
 
     # 3. MMR diversity — iterative selection (returns MMR scores)
     if diverse and len(top_indices) > 1:

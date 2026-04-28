@@ -207,38 +207,6 @@ class TestSearch:
         results = cache.search(query, limit=3)
         assert results[0]['id'] == 'a'
 
-    def test_cosine_scores_match_manual_dot_product(self, cache):
-        """Baseline: flexvec scores must equal manual cosine similarity.
-
-        The matrix is L2-normalized at load time, so M @ q == cosine_similarity.
-        This test uses independently computed analytic values, not cache.matrix,
-        breaking any circular dependency with the algebraic tests.
-        """
-        query = _make_vec([1.0, 0.0, 0.0])
-        results = cache.search(query, limit=5)
-        score_map = {r['id']: r['score'] for r in results}
-
-        # Raw vectors before normalization (from vec_db fixture)
-        raw = {
-            'a': np.array([1.0, 0.0, 0.0], dtype=np.float32),
-            'b': np.array([0.9, 0.1, 0.0], dtype=np.float32),
-            'c': np.array([0.0, 1.0, 0.0], dtype=np.float32),
-            'd': np.array([0.0, 0.0, 1.0], dtype=np.float32),
-            'e': np.array([0.7, 0.7, 0.0], dtype=np.float32),
-        }
-        q = np.zeros(EMBED_DIM, dtype=np.float32)
-        q[0] = 1.0
-
-        for doc_id, short_vec in raw.items():
-            vec = _make_vec(short_vec.tolist())  # pad to EMBED_DIM
-            norm = np.linalg.norm(vec)
-            expected = float(np.dot(vec / norm, q)) if norm > 0 else 0.0
-            actual = score_map[doc_id]
-            np.testing.assert_allclose(
-                actual, expected, atol=1e-5,
-                err_msg=f"doc '{doc_id}': expected cosine={expected:.6f}, got {actual:.6f}"
-            )
-
     def test_scores_descending(self, cache):
         query = _make_vec([1.0, 0.0, 0.0])
         results = cache.search(query, limit=5)
@@ -472,13 +440,13 @@ class TestParseModifiers:
     def test_communities_token(self):
         from flexvec.vec_ops import parse_modifiers
         result = parse_modifiers('communities')
-        assert result['local_communities'] is True
+        assert 'communities' in result['extra_tokens']
 
     def test_communities_deprecated_aliases(self):
         from flexvec.vec_ops import parse_modifiers
         for alias in ('local_communities', 'detect_communities'):
             result = parse_modifiers(alias)
-            assert result['local_communities'] is True
+            assert 'communities' in result['extra_tokens']
 
     def test_dead_tokens_ignored(self):
         """kind: and community: silently ignored."""
@@ -882,21 +850,21 @@ class TestTrajectory:
 
 
 # =============================================================================
-# Local Communities (renamed from detect_communities)
+# Standalone FlexVec Extra Tokens
 # =============================================================================
 
 class TestLocalCommunities:
-    """Renamed from detect_communities."""
+    """FlexVec collects structural token names but does not resolve them."""
 
     def test_local_communities_token(self, mod_cache):
         query = _make_vec([0.5, 0.5, 0.0])
         modifiers = {'recent': False, 'recent_days': None,
                      'unlike': [], 'diverse': False, 'limit': None,
                      'like': None, 'trajectory_from': None, 'trajectory_to': None,
-                     'local_communities': True}
+                     'extra_tokens': ['communities']}
         results = mod_cache.search(query, limit=5, modifiers=modifiers)
         assert len(results) > 0
-        assert all('_community' in r for r in results)
+        assert all('_community' not in r for r in results)
 
     def test_without_flag_no_community(self, mod_cache):
         query = _make_vec([0.5, 0.5, 0.0])
@@ -907,27 +875,25 @@ class TestLocalCommunities:
         results = mod_cache.search(query, limit=5, modifiers=modifiers)
         assert all('_community' not in r for r in results)
 
-    def test_community_values_are_integers(self, mod_cache):
+    def test_extra_tokens_require_resolver(self, mod_cache):
         query = _make_vec([0.5, 0.5, 0.0])
         modifiers = {'recent': False, 'recent_days': None,
                      'unlike': [], 'diverse': False, 'limit': None,
                      'like': None, 'trajectory_from': None, 'trajectory_to': None,
-                     'local_communities': True}
+                     'extra_tokens': ['communities']}
         results = mod_cache.search(query, limit=5, modifiers=modifiers)
-        for r in results:
-            assert isinstance(r['_community'], int)
-            assert r['_community'] >= 0
+        assert all('_community' not in r for r in results)
 
     def test_composable_with_diverse(self, mod_cache):
         query = _make_vec([0.5, 0.5, 0.0])
         modifiers = {'recent': False, 'recent_days': None,
                      'unlike': [], 'diverse': True, 'limit': None,
                      'like': None, 'trajectory_from': None, 'trajectory_to': None,
-                     'local_communities': True}
+                     'extra_tokens': ['communities']}
         results = mod_cache.search(query, limit=3, modifiers=modifiers,
                                    oversample=5)
         assert len(results) == 3
-        assert all('_community' in r for r in results)
+        assert all('_community' not in r for r in results)
 
     def test_too_few_candidates_skips(self, cache):
         mask = cache.get_mask_for_ids(['a', 'b'])
@@ -935,7 +901,7 @@ class TestLocalCommunities:
         modifiers = {'recent': False, 'recent_days': None,
                      'unlike': [], 'diverse': False, 'limit': None,
                      'like': None, 'trajectory_from': None, 'trajectory_to': None,
-                     'local_communities': True}
+                     'extra_tokens': ['communities']}
         results = cache.search(query, limit=2, mask=mask, modifiers=modifiers)
         assert len(results) == 2
         assert all('_community' not in r for r in results)

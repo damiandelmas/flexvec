@@ -58,12 +58,16 @@ class TestBasicRewrite:
         # Rank should be positive (negated BM25)
         assert rows[0]['rank'] > 0
 
-    def test_rank_positive_higher_better(self, db):
+    def test_rank_normalized_zero_one(self, db):
+        """Ranks are min-max normalized to [0, 1]."""
         sql = "SELECT k.id, k.rank FROM keyword('authentication') k ORDER BY k.rank DESC"
         result = materialize_keyword(db, sql)
         rows = db.execute(result).fetchall()
+        assert len(rows) >= 2
         for row in rows:
-            assert row['rank'] > 0
+            assert 0.0 <= row['rank'] <= 1.0
+        assert rows[0]['rank'] == 1.0
+        assert rows[-1]['rank'] == 0.0
 
     def test_snippet_present(self, db):
         sql = "SELECT k.id, k.snippet FROM keyword('authentication') k LIMIT 1"
