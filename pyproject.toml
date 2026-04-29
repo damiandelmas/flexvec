@@ -11,6 +11,10 @@ dependencies = ["numpy"]
 [project.optional-dependencies]
 embed = ["onnxruntime", "tokenizers"]
 graph = ["networkx"]
+mcp = ["mcp", "onnxruntime", "tokenizers"]
+
+[project.scripts]
+flexvec-mcp = "flexvec.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/damiandelmas/flexvec"
