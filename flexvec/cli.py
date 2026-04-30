@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from importlib import resources
 
 from flexvec import mcp_server
@@ -126,6 +127,11 @@ def build_parser() -> argparse.ArgumentParser:
         prog="flexvec",
         description="Agent-native SQLite vectorization and retrieval commands.",
     )
+    try:
+        package_version = version("flexvec")
+    except PackageNotFoundError:
+        package_version = "0+unknown"
+    parser.add_argument("--version", action="version", version=f"%(prog)s {package_version}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     inspect_p = sub.add_parser("inspect", help="Inspect a SQLite DB and return table/column facts.")

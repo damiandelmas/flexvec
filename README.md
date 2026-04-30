@@ -46,12 +46,16 @@ Query or hand the DB to an agent over MCP:
 
 ```bash
 flexvec sql app.db "SELECT v.id, v.score, c.content FROM vec_ops('similar:refund policy') v JOIN _raw_chunks c ON c.id = v.id LIMIT 10" --json
+flexvec sql app.db "SELECT k.id, k.rank, c.content FROM keyword('refund policy') k JOIN _raw_chunks c ON c.id = k.id LIMIT 10" --no-embed --json
 flexvec mcp app.db
 ```
 
 `prepare` creates FlexVec-owned `_flexvec_meta`, `_raw_chunks`, and `chunks_fts`
 surfaces inside the target database. FlexVec does not require a Flex registry,
 Flex cells, services, modules, or Labs packages.
+If those tables already exist, `prepare`/`index` return warnings before reusing
+or rebuilding them; copy the DB first or choose custom table names in the spec
+when reuse is not intended.
 
 ## Getting started
 

@@ -22,6 +22,12 @@ ORDER BY k.rank DESC
 LIMIT 10;
 ```
 
+Keyword-only CLI query without embedding/model setup:
+
+```bash
+flexvec sql app.db "SELECT k.id, k.rank, c.content FROM keyword('refund policy') k JOIN _raw_chunks c ON c.id = k.id ORDER BY k.rank DESC LIMIT 10" --no-embed --json
+```
+
 Hybrid retrieval:
 
 ```sql
@@ -45,4 +51,3 @@ JOIN _raw_chunks c ON c.id = v.id
 ORDER BY v.score DESC
 LIMIT 10;
 ```
-

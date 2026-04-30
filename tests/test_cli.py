@@ -7,6 +7,8 @@ import sqlite3
 from importlib import resources
 from pathlib import Path
 
+import pytest
+
 from flexvec import cli
 from flexvec.spec import RetrievalSpec, doctor_database, index_database, inspect_database, prepare_database
 
@@ -68,6 +70,7 @@ def test_inspect_prepare_index_and_doctor(tmp_path: Path):
 
     prepared = prepare_database(db_path, _spec())
     assert prepared["prepared"] is True
+    assert prepared["warnings"] == []
 
     indexed = index_database(
         db_path,
@@ -133,6 +136,22 @@ def test_cli_accepts_agent_alias_spec_with_multiple_text_columns(tmp_path: Path,
     assert "annual plans" in rows[0]["content"]
 
 
+def test_prepare_warns_before_reusing_unmanaged_retrieval_tables(tmp_path: Path):
+    db_path = tmp_path / "app.db"
+    _db(db_path)
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE _raw_chunks (id TEXT PRIMARY KEY, content TEXT)")
+    conn.execute("CREATE VIRTUAL TABLE chunks_fts USING fts5(content)")
+    conn.commit()
+    conn.close()
+
+    prepared = prepare_database(db_path, _spec())
+
+    assert len(prepared["warnings"]) == 2
+    assert "Existing table '_raw_chunks' will be reused" in prepared["warnings"][0]
+    assert "Existing FTS table 'chunks_fts' will be reused/rebuilt" in prepared["warnings"][1]
+
+
 def test_skill_path_points_to_packaged_skill(capsys):
     assert cli.main(["skill-path", "--json"]) == 0
     result = json.loads(capsys.readouterr().out)
@@ -140,6 +159,13 @@ def test_skill_path_points_to_packaged_skill(capsys):
     assert skill_path.name == "flexvec"
     assert (skill_path / "SKILL.md").exists()
     assert resources.files("flexvec.ai.skills.flexvec").joinpath("SKILL.md").is_file()
+
+
+def test_cli_version(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--version"])
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.startswith("flexvec ")
 
 
 def test_mcp_command_uses_stored_spec_defaults(tmp_path: Path, monkeypatch):

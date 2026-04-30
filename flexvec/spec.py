@@ -195,6 +195,32 @@ def write_spec(db: sqlite3.Connection, spec: RetrievalSpec) -> None:
     )
 
 
+def _has_stored_spec(db: sqlite3.Connection) -> bool:
+    if not table_exists(db, META_TABLE):
+        return False
+    row = db.execute(
+        f"SELECT 1 FROM {quote_ident(META_TABLE)} WHERE key = 'spec'"
+    ).fetchone()
+    return row is not None
+
+
+def _reuse_warnings(db: sqlite3.Connection, spec: RetrievalSpec, had_spec: bool) -> list[str]:
+    if had_spec:
+        return []
+    warnings = []
+    if table_exists(db, spec.chunk_table):
+        warnings.append(
+            f"Existing table {spec.chunk_table!r} will be reused; copy the DB first "
+            "or set chunk_table to a FlexVec-owned name if this is not intentional."
+        )
+    if table_exists(db, spec.fts_table):
+        warnings.append(
+            f"Existing FTS table {spec.fts_table!r} will be reused/rebuilt; copy the DB first "
+            "or set fts_table to a FlexVec-owned name if this is not intentional."
+        )
+    return warnings
+
+
 def _ensure_column(db: sqlite3.Connection, table: str, name: str, decl: str) -> None:
     existing = {col["name"] for col in table_columns(db, table)}
     if name not in existing:
@@ -206,6 +232,8 @@ def prepare_database(path: str | Path, spec: RetrievalSpec) -> dict[str, Any]:
     with connect(path) as db:
         if not table_exists(db, spec.table):
             raise ValueError(f"Source table does not exist: {spec.table}")
+        had_spec = _has_stored_spec(db)
+        warnings = _reuse_warnings(db, spec, had_spec)
         source_cols = {col["name"] for col in table_columns(db, spec.table)}
         required = {spec.id_col, *spec.text_cols, *spec.metadata_cols}
         missing = sorted(required - source_cols)
@@ -240,6 +268,7 @@ def prepare_database(path: str | Path, spec: RetrievalSpec) -> dict[str, Any]:
             "chunk_table": spec.chunk_table,
             "fts_table": spec.fts_table,
             "spec": asdict(spec),
+            "warnings": warnings,
         }
 
 
@@ -284,7 +313,7 @@ def index_database(
 
         embed_fn = get_embed_fn(prefix="search_document: ")
 
-    prepare_database(path, spec)
+    prepared = prepare_database(path, spec)
     with connect(path) as db:
         rows = _select_source_rows(db, spec, limit)
         indexed = 0
@@ -333,6 +362,7 @@ def index_database(
             "skip_embeddings": skip_embeddings,
             "chunk_table": spec.chunk_table,
             "fts_table": spec.fts_table,
+            "warnings": prepared.get("warnings", []),
         }
 
 

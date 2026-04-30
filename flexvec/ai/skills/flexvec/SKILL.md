@@ -35,6 +35,12 @@ flexvec prepare /path/to/app.db --spec spec.json --json
 flexvec index /path/to/app.db --spec spec.json --json
 ```
 
+For deterministic keyword-only validation or offline environments, skip embeddings:
+
+```bash
+flexvec index /path/to/app.db --spec spec.json --skip-embeddings --json
+```
+
 5. Verify readiness:
 
 ```bash
@@ -45,6 +51,12 @@ flexvec doctor /path/to/app.db --json
 
 ```bash
 flexvec sql /path/to/app.db "SELECT v.id, v.score, c.content FROM vec_ops('similar:refund policy') v JOIN _raw_chunks c ON c.id = v.id ORDER BY v.score DESC LIMIT 10" --json
+```
+
+Keyword-only query without embedding/model setup:
+
+```bash
+flexvec sql /path/to/app.db "SELECT k.id, k.rank, c.content FROM keyword('refund policy') k JOIN _raw_chunks c ON c.id = k.id ORDER BY k.rank DESC LIMIT 10" --no-embed --json
 ```
 
 7. Serve over MCP:
@@ -58,6 +70,7 @@ flexvec mcp /path/to/app.db
 - Treat the SQLite DB path as explicit state. Do not rely on hidden project globals.
 - Use `inspect` before creating a spec.
 - Use `prepare` before `index`.
+- If the DB already has `_raw_chunks` or `chunks_fts`, read prepare/index warnings carefully; copy the DB first or choose custom `chunk_table`/`fts_table` names if reuse is not intended.
 - Use `doctor` before handing the DB to another agent.
 - Use SQL as the canonical query language; `vec_ops()` and `keyword()` are table sources.
 - Do not import or depend on `flex.*` or Labs packages.

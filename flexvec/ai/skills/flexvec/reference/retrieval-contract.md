@@ -28,3 +28,8 @@ Optional fields:
 - `embedding_col`: BLOB column in `chunk_table`, default `embedding`.
 
 `prepare` stores this contract in `_flexvec_meta`. Later `index`, `doctor`, and MCP invocations can use the stored contract.
+
+If `chunk_table` or `fts_table` already exists before FlexVec has stored a spec,
+`prepare` reports warnings. This commonly happens when testing against a copied
+Flex cell. Copy the database first or choose custom table names if reuse is not
+intentional.
