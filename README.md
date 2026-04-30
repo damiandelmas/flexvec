@@ -4,20 +4,24 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 
-Composable vector retrieval with SQL.
+Agent-native vector retrieval for SQLite.
 
-flexvec is a Python library and agent-native CLI that reshapes vector search scores before selection. Suppress a topic, weight by recency, spread across subtopics, project a direction through embedding space — all in one SQL statement. Runs in-process on SQLite with optional local MCP serving. No hosted service.
+FlexVec turns ordinary SQLite databases into structured retrieval databases for
+AI agents. It can inspect an existing DB, create a retrieval contract, build a
+local retrieval surface, query it with SQL, and expose it over MCP. It also
+includes the lower-level vector scoring primitives: suppress a topic, weight by
+recency, spread across subtopics, or project through embedding space in one SQL
+statement.
+
+No hosted service. No separate vector database. No Flex runtime required.
 
 ```bash
-pip install flexvec
-pip install "flexvec[mcp]"    # agent MCP server + embeddings
+pip install "flexvec[mcp]"
 ```
 
-## Agent-native SQLite vectorization
+## Quickstart
 
-FlexVec can turn an existing SQLite table into an agent-ready retrieval surface.
-Commands are JSON-first so agents can inspect, prepare, index, verify, and serve
-one database deterministically.
+Start with any SQLite database:
 
 ```bash
 flexvec inspect app.db --json
@@ -42,7 +46,7 @@ flexvec index app.db --spec spec.json --json
 flexvec doctor app.db --json
 ```
 
-Query or hand the DB to an agent over MCP:
+Query with SQL or hand the DB to an agent over MCP:
 
 ```bash
 flexvec sql app.db "SELECT v.id, v.score, c.content FROM vec_ops('similar:refund policy') v JOIN _raw_chunks c ON c.id = v.id LIMIT 10" --json
@@ -57,11 +61,26 @@ If those tables already exist, `prepare`/`index` return warnings before reusing
 or rebuilding them; copy the DB first or choose custom table names in the spec
 when reuse is not intended.
 
-## Getting started
+## What You Get
 
-### Your table
+| surface | purpose |
+|---|---|
+| `flexvec inspect` | return table/column facts so an agent can choose a source table |
+| `flexvec prepare` | create `_flexvec_meta`, `_raw_chunks`, and `chunks_fts` |
+| `flexvec index` | copy source rows, rebuild FTS, and optionally embed content |
+| `flexvec doctor` | report retrieval readiness and embedding coverage |
+| `flexvec sql` | run read-only SQL with `keyword()` and `vec_ops()` materializers |
+| `flexvec mcp` / `flexvec-mcp` | expose one SQLite DB as an MCP tool |
+| `flexvec skill-path` | print the packaged agent skill path |
 
-Any SQLite database with an embedding column works.
+All command output is JSON-first for agent workflows.
+
+## Existing Embeddings
+
+If your database already has float32 embedding BLOBs, use FlexVec directly as a
+Python library.
+
+Example table:
 
 ```sql
 CREATE TABLE chunks (
@@ -70,8 +89,6 @@ CREATE TABLE chunks (
     embedding BLOB  -- float32, L2-normalized
 );
 ```
-
-### Connect
 
 Load embeddings into memory once. Every query after that is a matmul.
 
@@ -84,8 +101,6 @@ cache = VectorCache()
 cache.load_from_db(db, "chunks", "embedding", "id")
 register_vec_ops(db, {"chunks": cache}, get_embed_fn())
 ```
-
-### Search
 
 Write SQL. flexvec handles the vector math behind the scenes.
 
@@ -158,11 +173,13 @@ SQL pre-filter  →  numpy modulation  →  SQL compose
 2. **numpy modulation** scores candidates and reshapes the score array with tokens before selection.
 3. **SQL compose** joins results back to your tables for grouping, filtering, or reranking.
 
-The database is never modified. Results materialize as a temp table that SQL composes over.
+The query path is read-only aside from temporary result tables. The CLI
+`prepare` and `index` commands are explicit write operations that add or update
+FlexVec retrieval surfaces inside the target database.
 
 ## Performance
 
-No index. Brute-force matmul on a numpy matrix.
+No ANN index. Brute-force matmul on a numpy matrix.
 
 | corpus | matmul | full pipeline |
 |---|---|---|
