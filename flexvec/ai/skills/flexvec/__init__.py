@@ -1,0 +1,1 @@
+"""FlexVec agent skill package."""

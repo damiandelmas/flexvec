@@ -175,7 +175,8 @@ def score_candidates(
         embed_doc_fn: Embedding function for document-space text.
 
     Returns:
-        List of {id, score} sorted by score desc. May include _community.
+        List of {id, score} sorted by score desc. Resolver enrichments may
+        add fields when a token_resolver is provided.
     """
     if matrix is None or len(ids) == 0:
         return []

@@ -1,7 +1,7 @@
 [project]
 name = "flexvec"
-version = "0.3.0"
-description = "numpy-backed semantic search for any SQLite database"
+version = "0.4.0"
+description = "agent-native SQLite vector retrieval"
 license = { text = "MIT" }
 authors = [{name = "Damian Delmas", email = "damian@getflex.dev"}]
 readme = "README.md"
@@ -10,10 +10,10 @@ dependencies = ["numpy"]
 
 [project.optional-dependencies]
 embed = ["onnxruntime", "tokenizers"]
-graph = ["networkx"]
 mcp = ["mcp", "onnxruntime", "tokenizers"]
 
 [project.scripts]
+flexvec = "flexvec.cli:main"
 flexvec-mcp = "flexvec.mcp_server:main"
 
 [project.urls]
@@ -24,7 +24,12 @@ Paper = "https://arxiv.org/abs/2603.22587"
 include = ["flexvec*"]
 
 [tool.setuptools.package-data]
-flexvec = ["onnx/*.json", "onnx/vocab.txt"]
+flexvec = [
+  "onnx/*.json",
+  "onnx/vocab.txt",
+  "ai/skills/flexvec/*.md",
+  "ai/skills/flexvec/reference/*.md",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

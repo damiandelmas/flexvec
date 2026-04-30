@@ -1,8 +1,7 @@
-"""python -m flexvec download-model"""
-import sys
+"""Run the FlexVec agent-native CLI with ``python -m flexvec``."""
 
-if len(sys.argv) > 1 and sys.argv[1] == "download-model":
-    from flexvec.onnx.fetch import download_model
-    download_model()
-else:
-    print("usage: python -m flexvec download-model")
+from flexvec.cli import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

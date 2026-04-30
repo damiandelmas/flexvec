@@ -6,11 +6,52 @@
 
 Composable vector retrieval with SQL.
 
-flexvec is a Python library that reshapes vector search scores before selection. Suppress a topic, weight by recency, spread across subtopics, project a direction through embedding space — all in one SQL statement. Runs in-process on any SQLite database. No server, no index.
+flexvec is a Python library and agent-native CLI that reshapes vector search scores before selection. Suppress a topic, weight by recency, spread across subtopics, project a direction through embedding space — all in one SQL statement. Runs in-process on SQLite with optional local MCP serving. No hosted service.
 
 ```bash
 pip install flexvec
+pip install "flexvec[mcp]"    # agent MCP server + embeddings
 ```
+
+## Agent-native SQLite vectorization
+
+FlexVec can turn an existing SQLite table into an agent-ready retrieval surface.
+Commands are JSON-first so agents can inspect, prepare, index, verify, and serve
+one database deterministically.
+
+```bash
+flexvec inspect app.db --json
+```
+
+Create a retrieval contract:
+
+```json
+{
+  "table": "docs",
+  "id_column": "id",
+  "text_columns": ["title", "body"],
+  "metadata_cols": ["created_at"]
+}
+```
+
+Prepare and index the database:
+
+```bash
+flexvec prepare app.db --spec spec.json --json
+flexvec index app.db --spec spec.json --json
+flexvec doctor app.db --json
+```
+
+Query or hand the DB to an agent over MCP:
+
+```bash
+flexvec sql app.db "SELECT v.id, v.score, c.content FROM vec_ops('similar:refund policy') v JOIN _raw_chunks c ON c.id = v.id LIMIT 10" --json
+flexvec mcp app.db
+```
+
+`prepare` creates FlexVec-owned `_flexvec_meta`, `_raw_chunks`, and `chunks_fts`
+surfaces inside the target database. FlexVec does not require a Flex registry,
+Flex cells, services, modules, or Labs packages.
 
 ## Getting started
 
@@ -132,7 +173,7 @@ No index. Brute-force matmul on a numpy matrix.
 ```bash
 pip install flexvec              # core (numpy only)
 pip install flexvec[embed]       # + ONNX embedder
-pip install flexvec[embed,graph] # everything
+pip install flexvec[mcp]         # + MCP server and embedder
 ```
 
 ## See also
